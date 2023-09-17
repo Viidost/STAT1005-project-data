@@ -1,0 +1,54 @@
+```{r}
+#Import and format data
+data = read_excel("CleanedData.xlsx")
+data$t_total = period_to_seconds(hms(format(data$t_total, 
+                                            format = '%H:%M:%S')))/(60*60)
+fgroup = data
+fgroup[fgroup$faculty != 'Faculty of Science & Engineering',]['faculty'] = 
+  'Other faculties'
+
+#Plots
+#Histogram
+ggplot(fgroup, aes(x=t_total, fill=faculty)) +
+  geom_bar(colour = "black") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE) +
+  scale_fill_manual(values = c("#F8766D","#619CFF")) +
+  labs(caption = bquote(bold("Figure 2.\n")~"Hours of phone usage on weekdays of Curtin University students from the Faculty of Science & Engineering\nand other faculties showing approximate normal distribution.")) +
+  xlab("Time (hours)") +
+  ylab("Number of Students") +
+  theme(plot.caption = element_text(vjust = -2), plot.caption.position = "panel", legend.position = "none") +
+  facet_grid(faculty ~ .)
+
+#Boxplot
+ggplot(fgroup, aes(x=faculty, y=t_total, fill=faculty)) +
+  stat_boxplot(geom = "errorbar", width = .25) +
+  geom_boxplot(show.legend = FALSE) +
+  scale_fill_manual(values = c("#F8766D","#619CFF")) +
+  labs(caption = bquote(bold("Figure 1.\n")~"Mean, median, and IQR of weekday phone usage of Curtin University students\nfrom the Faculty of Science & Engineering and other faculties.")) +
+  theme_hc() +
+  theme(plot.caption = element_text(vjust = -2.5)) +
+  stat_summary(fun = "mean", shape = 1, show.legend = FALSE) +
+  xlab("Faculty") +
+  ylab("Time (hours)")
+
+#Table
+eng_t = fgroup$t_total[fgroup$faculty == "Faculty of Science & Engineering"]
+oth_t = fgroup$t_total[fgroup$faculty != "Faculty of Science & Engineering"]
+tab = data.frame("N" = c(length(eng_t),length(oth_t)), 
+                 "mean" = c(mean(eng_t), mean(oth_t)), 
+                 "sd" = c(sd(eng_t),sd(oth_t)), 
+                 row.names = c("Faculty of Science & Engineering", 
+                               "Other Faculties"))
+
+kable(tab, caption = "Table 1. sample size, mean and standard deviation of Curtin University students from seperate groups", 
+      digits = 2) %>%
+  kable_classic(full_width = F) %>%
+  as_image()
+
+#Tests
+#F-test
+var.test(t_total ~ faculty, data = fgroup)
+
+#t-test
+t.test(t_total ~ faculty, data = fgroup, detailed = TRUE, var.equal = TRUE)
+```

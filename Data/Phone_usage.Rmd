@@ -1,0 +1,276 @@
+---
+title: "Phone_Usage"
+author: "Jesse Stanley"
+output: html_document
+date: "2023-09-14"
+---
+
+## Setup & Cleaning
+```{r}
+#import packages
+library(readxl)
+library(dplyr)
+library(chron)
+library(ggplot2)
+library(lubridate)
+library(data.table)
+library(ggthemes)
+library(knitr)
+library(kableExtra)
+library(magick)
+
+#read file
+data = read_excel("CleanedData.xlsx")
+
+#convert times to numeric
+data$t_total = period_to_seconds(hms(format(data$t_total, 
+                                            format = '%H:%M:%S')))/(60*60)
+data$t_app = period_to_seconds(hms(format(data$t_app, 
+                                          format = '%H:%M:%S')))/(60*60)
+data$t_com_app = period_to_seconds(hms(format(data$t_com_app, 
+                                              format = '%H:%M:%S')))/(60*60)
+```
+
+## View Raw Data
+```{r}
+View(data)
+```
+
+## Overview
+```{r}
+#plot total time
+ggplot(data, aes(x=t_total)) +
+  geom_bar(colour = "black", fill = "grey") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE) +
+  labs(title = "Total Time")
+
+#plot most used apps
+ggplot(data, aes(x=app)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25), 
+        axis.line.y = element_line()) +
+    labs(title = "Most Used App")
+
+#plot most used apps time
+ggplot(data, aes(x=t_app)) +
+  geom_bar(colour = "black", fill = "grey") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE) +
+  labs(title = "Most Used App Time")
+
+#plot most used communication apps
+ggplot(data, aes(x=com_app)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25), 
+        axis.line.y = element_line()) +
+  labs(title = "Most Used Communication App")
+
+#plot most used communication apps time
+ggplot(data, aes(x=t_com_app)) +
+  geom_bar(colour = "black", fill = "grey") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE) +
+  labs(title = "Most Used Communication App Time")
+```
+
+## Group Data
+```{r}
+#separate into Science & Engineering and Other groups
+fgroup = data
+fgroup[fgroup$faculty != 'Faculty of Science & Engineering',]['faculty'] = 
+  'Other faculties'
+
+#sample group sizes
+scieng = count(fgroup[fgroup$faculty == "Faculty of Science & Engineering",])
+oth = count(fgroup[fgroup$faculty == "Other faculties",])
+cat("Sample Sizes\n\nScience and eng: ",as.character(scieng),"\nOther: ",
+    as.character(oth),"\n")
+```
+
+## Hitograms of Total Time 
+```{r}
+#stacked together
+ggplot(fgroup, aes(x=t_total, fill=faculty)) +
+  geom_bar(colour = "black") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE) +
+  scale_fill_manual(values = c("#F8766D","#619CFF")) +
+  labs(caption = bquote(bold("Figure 2.\n")~"Hours of phone usage on weekdays of Curtin University students from the Faculty of Science & Engineering\nand other faculties showing approximate normal distribution.")) +
+  xlab("Time (hours)") +
+  ylab("Number of Students") +
+  theme(plot.caption = element_text(vjust = -2), plot.caption.position = "panel", legend.position = "none") +
+  facet_grid(faculty ~ .)
+  
+#Faculty of Science & Engineering
+ggplot(fgroup[fgroup$faculty == "Faculty of Science & Engineering",], aes(x=t_total)) +
+  geom_bar(colour = "black", fill = "#F8766D") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE, limits = c(0,20)) +
+  labs(title = "Total Phone Usage for Science & Engineering Faculty", 
+       caption = "Hours of phone usage on weekday for Science & Engineering students") +
+  xlab("Hours") +
+  ylab("Number of Students")
+
+#Other Faculties
+ggplot(fgroup[fgroup$faculty == "Other faculties",], aes(x=t_total)) +
+  geom_bar(colour = "black", fill = "#619CFF") +
+  scale_x_binned(n.breaks = 20, show.limits = TRUE, limits = c(0,20))
+```
+
+## Testing Total Time for Assosciation
+```{r}
+#F-test
+var.test(t_total ~ faculty, data = fgroup)
+```
+
+p-value > 0.05, therefore the null hypothesis that the variances\
+are the same is a safe assumption
+
+```{r}
+#t-test
+t.test(t_total ~ faculty, data = fgroup, detailed = TRUE, var.equal = TRUE)
+```
+
+p-value < 0.05, therefore the alternate hypothesis accepted that the average\
+number of hours spent on a phone on a weekday is different for Science and\
+engineering students compared to other faculties
+
+## Boxplots of Total Time
+```{r}
+ggplot(fgroup, aes(x=faculty, y=t_total, fill=faculty)) +
+  stat_boxplot(geom = "errorbar", width = .25) +
+  geom_boxplot(show.legend = FALSE) +
+  scale_fill_manual(values = c("#F8766D","#619CFF")) +
+  labs(caption = bquote(bold("Figure 1.\n")~"Mean, median, and IQR of weekday phone usage of Curtin University students\nfrom the Faculty of Science & Engineering and other faculties.")) +
+  theme_hc() +
+  theme(plot.caption = element_text(vjust = -2.5)) +
+  stat_summary(fun = "mean", shape = 1, show.legend = FALSE) +
+  xlab("Faculty") +
+  ylab("Time (hours)")
+```
+
+## Histograms of Most Used App Time
+```{r}
+#stacked together
+ggplot(fgroup, aes(x=t_app, fill=faculty)) +
+  geom_bar(colour = "black", position = "stack") +
+  scale_x_binned(n.breaks = 10, show.limits = TRUE, limits = c(0,10)) +
+  scale_fill_manual(values = c("#F8766D","#619CFF"))
+
+#Faculty of Science & Engineering
+ggplot(fgroup[fgroup$faculty == "Faculty of Science & Engineering",], aes(x=t_app)) +
+  geom_bar(colour = "black", fill = "#F8766D") +
+  scale_x_binned(n.breaks = 10, show.limits = TRUE, limits = c(0,10))
+
+#Other Faculties
+ggplot(fgroup[fgroup$faculty == "Other faculties",], aes(x=t_app)) +
+  geom_bar(colour = "black", fill = "#619CFF") +
+  scale_x_binned(n.breaks = 10, show.limits = TRUE, limits = c(0,10))
+```
+
+```{r}
+#Barplot of most used apps
+ggplot(fgroup, aes(x=app, fill=faculty)) +
+  geom_bar(position = position_dodge2(preserve = "single", padding = 0.05)) +
+  scale_fill_manual(values = c("#F8766D","#619CFF")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25))
+```
+
+## Testing Most Used App Time for Association
+```{r}
+#F-test
+var.test(t_app ~ faculty, data = fgroup)
+```
+
+p-value > 0.05, therefore the null hypothesis that the variances\
+are the same is a safe assumption
+
+```{r}
+#t-test
+t.test(t_app ~ faculty, data = fgroup, detailed = TRUE, var.equal = TRUE)
+```
+
+p-value > 0.05, therefore the null hypothesis is accepted that the\
+average number of hours spent on the most used app on a weekday is the same for\
+Science and engineering students compared to other faculties
+
+## Boxplots of Most Used App Time
+```{r}
+ggplot(fgroup, aes(x=faculty, y=t_app)) +
+  geom_boxplot()
+```
+
+## Histograms of Most Used Communication App Time
+```{r}
+#stacked together
+ggplot(fgroup, aes(x=t_com_app, fill=faculty)) +
+  geom_bar(colour = "black", position = "stack") +
+  scale_x_binned(n.breaks = 10, show.limits = TRUE, limits = c(0,10)) +
+  scale_fill_manual(values = c("#F8766D","#619CFF"))
+
+#Faculty of Science & Engineering
+ggplot(fgroup[fgroup$faculty == "Faculty of Science & Engineering",], aes(x=t_com_app)) +
+  geom_bar(colour = "black", fill = "#F8766D") +
+  scale_x_binned(n.breaks = 10, show.limits = TRUE, limits = c(0,10))
+
+#Other Faculties
+ggplot(fgroup[fgroup$faculty == "Other faculties",], aes(x=t_com_app)) +
+  geom_bar(colour = "black", fill = "#619CFF") +
+  scale_x_binned(n.breaks = 10, show.limits = TRUE, limits = c(0,10))
+```
+```{r}
+#Barplot of most used communication app
+ggplot(fgroup, aes(x=com_app, fill=faculty)) +
+  geom_bar(position = position_dodge2(preserve = "single", padding = 0.05)) +
+  scale_fill_manual(values = c("#F8766D","#619CFF")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.25))
+```
+
+## Testing Most Used Communication App Time for Association
+```{r}
+#F-test
+var.test(t_com_app ~ faculty, data = fgroup)
+```
+
+p-value > 0.05, therefore the null hypothesis that the variances\
+are the same is a safe assumption
+
+```{r}
+#t-test
+t.test(t_com_app ~ faculty, data = fgroup, detailed = TRUE, var.equal = TRUE)
+```
+
+p-value > 0.05, therefore the null hypothesis is accepted that the\
+average number of hours spent on the most used communication app on a weekday\
+is the same for Science and engineering students compared to other faculties
+
+## Boxplots for Most Used Communication App Time
+```{r}
+#boxplots for most used com app
+ggplot(fgroup, aes(x=faculty, y=t_com_app)) +
+  geom_boxplot()
+```
+
+## Statistics Table
+```{r}
+eng_t = fgroup$t_total[fgroup$faculty == "Faculty of Science & Engineering"]
+oth_t = fgroup$t_total[fgroup$faculty != "Faculty of Science & Engineering"]
+tab = data.frame("N" = c(length(eng_t),length(oth_t)), 
+                 "mean" = c(mean(eng_t), mean(oth_t)), 
+                 "sd" = c(sd(eng_t),sd(oth_t)), 
+                 row.names = c("Faculty of Science & Engineering", 
+                               "Other Faculties"))
+
+kable(tab, caption = "Table 1. sample size, mean and standard deviation of Curtin University students from seperate groups", 
+      digits = 2) %>%
+  kable_classic(full_width = F) %>%
+  as_image()
+```
+
+## Other Statistics
+```{r}
+#count of students whos most used app is the same as most used communication app
+secount = count(fgroup[fgroup$faculty == 'Faculty of Science & Engineering' & fgroup$com_app == "Same as most used app",])
+ocount = count(fgroup[fgroup$faculty == 'Other faculties' & fgroup$com_app == "Same as most used app",])
+cat('"Same as most used app count"\n\nScience and eng: ',as.character(secount),"\nOther: ",as.character(ocount),"\n")
+
+#summary
+vtable::sumtable(fgroup)
+```
+
